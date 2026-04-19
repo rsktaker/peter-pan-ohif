@@ -327,10 +327,33 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
 
     const viewportInfo = this.viewportsById.get(viewportId);
 
+    // peter-pan: in CPU rendering mode, Stack viewports can throw inside
+    // getViewReference when camera.viewUp hasn't been populated yet (seen on
+    // rapid series switches: vec3.js:374 "Cannot read properties of
+    // undefined (reading '0')"). The enclosing performResize catches the
+    // throw but then skips the whole resize + presentation-restore path,
+    // which is why images drift up-left on repeated series switches. Guard
+    // each piece individually and return a partial presentation so resize
+    // still happens cleanly.
+    let viewReference = null;
+    if (!(csViewport instanceof VolumeViewport3D)) {
+      try {
+        viewReference = csViewport.getViewReference();
+      } catch (e) {
+        console.info('[peter-pan] getViewReference failed (CPU mode race):', e);
+      }
+    }
+    let viewPresentation = null;
+    try {
+      viewPresentation = csViewport.getViewPresentation({ pan: true, zoom: true });
+    } catch (e) {
+      console.info('[peter-pan] getViewPresentation failed:', e);
+    }
+
     return {
       viewportType: viewportInfo.getViewportType(),
-      viewReference: csViewport instanceof VolumeViewport3D ? null : csViewport.getViewReference(),
-      viewPresentation: csViewport.getViewPresentation({ pan: true, zoom: true }),
+      viewReference,
+      viewPresentation,
       viewportId,
     };
   }
@@ -1381,11 +1404,16 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
       // Store the current position presentations for each viewport.
       viewports.forEach(({ id: viewportId }) => {
         const presentation = this._getPositionPresentation(viewportId);
+        if (!presentation) {
+          return;
+        }
 
         // During a resize, the slice index should remain unchanged. This is a temporary fix for
         // a larger issue regarding the definition of slice index with slab thickness.
         // We need to revisit this to make it more robust and understandable.
-        delete presentation.viewReference?.sliceIndex;
+        if (presentation.viewReference) {
+          delete presentation.viewReference.sliceIndex;
+        }
         this.beforeResizePositionPresentations.set(viewportId, presentation);
       });
 
