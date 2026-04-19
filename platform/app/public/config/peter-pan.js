@@ -7,6 +7,12 @@ window.config = {
   modes: [],
   // OHIF's study list is not exposed — the peter-pan app handles worklist/nav.
   showStudyList: false,
+  // Force CPU rendering to avoid Cornerstone3D's WebGLContextPool which
+  // instantiates a vtkOffscreenMultiRenderWindow eagerly and crashes on
+  // `new Proxy(null, ...)` when WebGL2 context allocation fails (seen in
+  // production iframe contexts: "CornerstoneRender: GPU not detected, using
+  // CPU rendering" still fires while VTK tries WebGL2 anyway).
+  useCPURendering: true,
   maxNumberOfWebWorkers: 3,
   showWarningMessageForCrossOrigin: true,
   showCPUFallbackMessage: true,
