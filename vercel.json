@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "yarn install --frozen-lockfile --network-timeout 1000000",
+  "buildCommand": "yarn run build",
+  "outputDirectory": "platform/app/dist",
+  "framework": null
+}
