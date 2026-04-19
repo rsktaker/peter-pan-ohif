@@ -364,6 +364,16 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
           madeInClient = false,
           returnPromises = false,
         } = {}) => {
+          // peter-pan debug: confirm this actually fires and what StudyInstanceUID
+          // OHIF is asking us to fetch. If this never logs, OHIF bailed out
+          // before reaching the DICOMweb data source.
+          console.info('[peter-pan][dicomweb] retrieve.series.metadata called', {
+            StudyInstanceUID,
+            qidoRoot: dicomWebConfig.qidoRoot,
+            wadoRoot: dicomWebConfig.wadoRoot,
+            enableStudyLazyLoad: dicomWebConfig.enableStudyLazyLoad,
+          });
+
           if (!StudyInstanceUID) {
             throw new Error('Unable to query for SeriesMetadata without StudyInstanceUID');
           }
@@ -699,6 +709,16 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
         StudyInstanceUIDs && Array.isArray(StudyInstanceUIDs)
           ? StudyInstanceUIDs
           : [StudyInstanceUIDs];
+
+      // peter-pan debug: trace the StudyInstanceUIDs parse path so we can see
+      // in the browser console whether OHIF saw the ID in the iframe URL.
+      console.info('[peter-pan][dicomweb] getStudyInstanceUIDs', {
+        params,
+        queryKeys: Array.from(query.keys()),
+        queryStudyInstanceUIDs,
+        paramsStudyInstanceUIDs,
+        resolved: StudyInstanceUIDsAsArray,
+      });
 
       return StudyInstanceUIDsAsArray;
     },

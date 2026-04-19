@@ -120,11 +120,21 @@ export default function ModeRoute({
 
     // Todo: this should not be here, data source should not care about params
     const initializeDataSource = async (params, query) => {
+      // peter-pan debug: show which data source won out and what params/query
+      // were resolved. If activeSource is 'dicomjson' we've been routed to the
+      // wrong data source and zero studies will load.
+      console.info('[peter-pan][mode] initializeDataSource', {
+        params,
+        queryKeys: Array.from(query.keys()),
+        dataSourceActive: dataSource?.type,
+      });
       await dataSource.initialize({
         params,
         query,
       });
-      setStudyInstanceUIDs(dataSource.getStudyInstanceUIDs({ params, query }));
+      const uids = dataSource.getStudyInstanceUIDs({ params, query });
+      console.info('[peter-pan][mode] studyInstanceUIDs resolved', uids);
+      setStudyInstanceUIDs(uids);
     };
 
     initializeDataSource(params, query);
