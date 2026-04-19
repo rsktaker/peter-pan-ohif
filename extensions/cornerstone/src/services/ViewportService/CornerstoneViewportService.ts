@@ -488,12 +488,13 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     // using its viewport (same viewportId as the new viewportInfo)
     const viewportInfo = this.viewportsById.get(viewportId);
 
-    // We should store the presentation for the current viewport since we can't only
-    // rely to store it WHEN the viewport is disabled since we might keep around the
-    // same viewport/element and just change the viewportData for it (drag and drop etc.)
-    // the disableElement storePresentation handle would not be called in this case
-    // and we would lose the presentation.
-    this.storePresentation({ viewportId: viewportInfo.getViewportId() });
+    // peter-pan: removed the inline storePresentation call here. With it,
+    // every series switch fed a feedback loop where the current viewport
+    // state (world pan) was saved under the incoming series' key and then
+    // reapplied to a new image with different origin/scale, drifting the
+    // image by pixels per switch. Unmount cleanup still saves presentations
+    // the correct way. We accept losing drag-and-drop zoom persistence for
+    // now — it's a niche case and not worth the guaranteed drift.
 
     // Todo: i don't like this here, move it
     this.servicesManager.services.segmentationService.clearSegmentationRepresentations(
@@ -1486,20 +1487,11 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
       renderingEngine.resize(isImmediate);
       renderingEngine.render();
 
-      stage = 'restore';
-      this.beforeResizePositionPresentations.forEach((positionPresentation, viewportId) => {
-        if (verbose) {
-          console.info('[peter-pan][resize] restoring presentation', {
-            viewportId,
-            pan: positionPresentation?.viewPresentation?.pan,
-            zoom: positionPresentation?.viewPresentation?.zoom,
-          });
-        }
-        this.setPresentations(viewportId, {
-          positionPresentation,
-        });
-      });
-
+      // peter-pan: position restore after resize is disabled. It was
+      // applying stale pan/zoom to viewports whose display set had changed,
+      // causing cumulative drift on series switches. The old behavior was
+      // "preserve zoom across layout resizes" — nice-to-have, not worth
+      // corrupting image positioning.
       stage = 'resize-render-final';
       renderingEngine.resize(isImmediate);
       renderingEngine.render();
