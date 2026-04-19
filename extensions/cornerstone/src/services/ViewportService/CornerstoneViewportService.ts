@@ -242,6 +242,23 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
 
     const { lutPresentation, positionPresentation, segmentationPresentation } = presentations;
 
+    // peter-pan: trace which position is being applied to the viewport and
+    // from where. Pan/zoom mutations show up here — if we see a stale pan
+    // being applied on series switch, this is the call site.
+    if (_peterpanVerbose()) {
+      const stack = new Error().stack?.split('\n').slice(2, 5).map(s => s.trim()).join(' <- ');
+      console.info('[peter-pan][setPresentations] applying', {
+        viewportId,
+        hasPositionPresentation: !!positionPresentation,
+        pan:
+          positionPresentation?.viewPresentation?.pan &&
+          Array.from(positionPresentation.viewPresentation.pan),
+        zoom: positionPresentation?.viewPresentation?.zoom,
+        sliceIndex: positionPresentation?.viewReference?.sliceIndex,
+        caller: stack,
+      });
+    }
+
     // Always set the segmentation presentation first, since there might be some
     // lutpresentation states that need to be set on the segmentation
     // Todo: i think we should even await this
@@ -279,6 +296,20 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     const { setPositionPresentation } = usePositionPresentationStore.getState();
     const { setSynchronizers } = useSynchronizersStore.getState();
     const { setSegmentationPresentation } = useSegmentationPresentationStore.getState();
+
+    // peter-pan: trace the store call with caller info + actual pan/zoom
+    // values so we can see which call site writes what to the store.
+    if (_peterpanVerbose()) {
+      const stack = new Error().stack?.split('\n').slice(2, 5).map(s => s.trim()).join(' <- ');
+      console.info('[peter-pan][storePresentation]', {
+        viewportId,
+        positionPresentationId,
+        pan: positionPresentation?.viewPresentation?.pan && Array.from(positionPresentation.viewPresentation.pan),
+        zoom: positionPresentation?.viewPresentation?.zoom,
+        sliceIndex: positionPresentation?.viewReference?.sliceIndex,
+        caller: stack,
+      });
+    }
 
     if (lutPresentationId) {
       setLutPresentation(lutPresentationId, lutPresentation);
@@ -369,7 +400,7 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     if (verbose) {
       console.info('[peter-pan][viewport] captured presentation', {
         viewportId,
-        pan: viewPresentation?.pan,
+        pan: viewPresentation?.pan && Array.from(viewPresentation.pan),
         zoom: viewPresentation?.zoom,
         sliceIndex: viewReference?.sliceIndex,
       });
