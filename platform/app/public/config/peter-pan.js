@@ -14,8 +14,10 @@ window.config = {
   // CPU rendering" still fires while VTK tries WebGL2 anyway).
   useCPURendering: true,
   maxNumberOfWebWorkers: 3,
-  showWarningMessageForCrossOrigin: true,
-  showCPUFallbackMessage: true,
+  showWarningMessageForCrossOrigin: false,
+  // Suppress the "OHIF Fell Back to CPU Rendering" modal — we force CPU mode
+  // deliberately via useCPURendering, so the warning is noise.
+  showCPUFallbackMessage: false,
   showLoadingIndicator: true,
   strictZSpacingForVolumeViewport: true,
   defaultDataSourceName: 'dicomweb',

@@ -67,6 +67,13 @@ function ViewportOrientationMarkers({
     const p00 = viewport.canvasToWorld([0, 0]);
     const p10 = viewport.canvasToWorld([1, 0]);
     const p01 = viewport.canvasToWorld([0, 1]);
+    // peter-pan: canvasToWorld can return undefined in CPU rendering mode
+    // before the viewport camera is fully initialized (e.g. on rapid series
+    // switches / resize). Avoid the vec3 crash by bailing out until the next
+    // render cycle when the viewport is ready.
+    if (!p00 || !p10 || !p01) {
+      return '';
+    }
     const rowCosines = vec3.sub(vec3.create(), p10, p00);
     const columnCosines = vec3.sub(vec3.create(), p01, p00);
 
