@@ -52,6 +52,17 @@ const MIN_VOLUME_VIEWPORTS_TO_ENQUEUE_RESIZE = 6;
 export const WITH_NAVIGATION = { withNavigation: true, withOrientation: false };
 export const WITH_ORIENTATION = { withNavigation: true, withOrientation: true };
 
+// peter-pan: verbose viewport-lifecycle logging. Enable in the browser with:
+//   localStorage.peterpan_ohif_verbose = '1'
+// Persists across reloads; clear with `delete localStorage.peterpan_ohif_verbose`.
+export function _peterpanVerbose(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.localStorage?.getItem('peterpan_ohif_verbose') === '1';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Handles cornerstone viewport logic including enabling, disabling, and
  * updating the viewport.
@@ -326,36 +337,45 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     }
 
     const viewportInfo = this.viewportsById.get(viewportId);
+    const verbose = _peterpanVerbose();
 
-    // peter-pan: in CPU rendering mode, Stack viewports can throw inside
-    // getViewReference when camera.viewUp hasn't been populated yet (seen on
-    // rapid series switches: vec3.js:374 "Cannot read properties of
-    // undefined (reading '0')"). The enclosing performResize catches the
-    // throw but then skips the whole resize + presentation-restore path,
-    // which is why images drift up-left on repeated series switches. Guard
-    // each piece individually and return a partial presentation so resize
-    // still happens cleanly.
-    let viewReference = null;
-    if (!(csViewport instanceof VolumeViewport3D)) {
-      try {
-        viewReference = csViewport.getViewReference();
-      } catch (e) {
-        console.info('[peter-pan] getViewReference failed (CPU mode race):', e);
-      }
-    }
-    let viewPresentation = null;
+    // peter-pan: all-or-nothing capture. If either getViewReference or
+    // getViewPresentation throws (CPU mode race on series switch), return
+    // undefined so performResize skips the restore step entirely rather
+    // than baking in partial state that drifts on subsequent switches.
+    let viewReference;
+    let viewPresentation;
     try {
+      viewReference =
+        csViewport instanceof VolumeViewport3D ? null : csViewport.getViewReference();
       viewPresentation = csViewport.getViewPresentation({ pan: true, zoom: true });
     } catch (e) {
-      console.info('[peter-pan] getViewPresentation failed:', e);
+      if (verbose) {
+        console.warn(
+          '[peter-pan][viewport] _getPositionPresentation capture failed — skipping restore',
+          { viewportId, error: e }
+        );
+      }
+      return undefined;
     }
 
-    return {
+    const result = {
       viewportType: viewportInfo.getViewportType(),
       viewReference,
       viewPresentation,
       viewportId,
     };
+
+    if (verbose) {
+      console.info('[peter-pan][viewport] captured presentation', {
+        viewportId,
+        pan: viewPresentation?.pan,
+        zoom: viewPresentation?.zoom,
+        sliceIndex: viewReference?.sliceIndex,
+      });
+    }
+
+    return result;
   }
 
   private _getLutPresentation(viewportId: string): LutPresentation {
@@ -1397,14 +1417,27 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
 
   private performResize() {
     const isImmediate = false;
+    const verbose = _peterpanVerbose();
+    const t0 = Date.now();
+    let stage = 'init';
 
     try {
       const viewports = this.getRenderingEngine().getViewports();
+      if (verbose) {
+        console.groupCollapsed(
+          `[peter-pan][resize] performResize start — ${viewports.length} viewport(s)`
+        );
+      }
 
-      // Store the current position presentations for each viewport.
+      // Clear previous capture so a failed capture can't leak stale state
+      // into the next resize.
+      this.beforeResizePositionPresentations.clear();
+
+      stage = 'capture';
       viewports.forEach(({ id: viewportId }) => {
         const presentation = this._getPositionPresentation(viewportId);
         if (!presentation) {
+          if (verbose) console.warn('[peter-pan][resize] skip capture for', viewportId);
           return;
         }
 
@@ -1417,25 +1450,39 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         this.beforeResizePositionPresentations.set(viewportId, presentation);
       });
 
-      // Resize the rendering engine and render.
+      stage = 'resize-engine';
       const renderingEngine = this.renderingEngine;
       renderingEngine.resize(isImmediate);
       renderingEngine.render();
 
-      // Reset the camera for all viewports using position presentation to maintain relative size/position
-      // which means only those viewports that have a zoom level of 1.
+      stage = 'restore';
       this.beforeResizePositionPresentations.forEach((positionPresentation, viewportId) => {
+        if (verbose) {
+          console.info('[peter-pan][resize] restoring presentation', {
+            viewportId,
+            pan: positionPresentation?.viewPresentation?.pan,
+            zoom: positionPresentation?.viewPresentation?.zoom,
+          });
+        }
         this.setPresentations(viewportId, {
           positionPresentation,
         });
       });
 
-      // Resize and render the rendering engine again.
+      stage = 'resize-render-final';
       renderingEngine.resize(isImmediate);
       renderingEngine.render();
+
+      if (verbose) {
+        console.info(`[peter-pan][resize] done in ${Date.now() - t0}ms`);
+        console.groupEnd();
+      }
     } catch (e) {
-      // This can happen if the resize is too close to navigation or shutdown
-      console.warn('Caught resize exception', e);
+      console.warn(`Caught resize exception at stage=${stage}`, e);
+      if (verbose) {
+        console.error('[peter-pan][resize] exception stage:', stage, e);
+        console.groupEnd?.();
+      }
     }
   }
 

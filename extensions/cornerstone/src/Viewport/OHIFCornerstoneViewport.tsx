@@ -116,6 +116,23 @@ const OHIFCornerstoneViewport = React.memo(
             prevDimensions.width !== width || prevDimensions.height !== height;
 
           if (width > 0 && height > 0 && hasDimensionsChanged) {
+            // peter-pan: log dimension change source when verbose is on.
+            try {
+              if (typeof window !== 'undefined' && window.localStorage?.getItem('peterpan_ohif_verbose') === '1') {
+                // eslint-disable-next-line no-console
+                console.info('[peter-pan][resize-observer] dimensions changed', {
+                  viewportId,
+                  from: prevDimensions,
+                  to: { width, height },
+                  delta: {
+                    w: width - prevDimensions.width,
+                    h: height - prevDimensions.height,
+                  },
+                });
+              }
+            } catch {
+              /* noop */
+            }
             viewportDimensions.set(viewportId, { width, height });
             // Perform resize operations
             cornerstoneViewportService.resize();
