@@ -1,9 +1,10 @@
-// peter-pan patient mode. When OHIF is loaded via the iframe with
-// ?patientMode=1 (the patient portal hits this), we strip the clinical
-// chrome — toolbars, measurement/segmentation panels, 3D/MPR buttons —
-// leaving a plain viewport with scroll/pan/zoom. We do this by injecting
-// a stylesheet at page load rather than forking app-config, so both
-// staff and patient views share one OHIF deployment.
+// peter-pan OHIF config — shared by staff (Pro) and patient portal.
+//
+// patientMode (set via ?patientMode=1 on the iframe URL) strips the clinical
+// chrome and suppresses every modal dialog so the patient sees only pixels.
+// Staff mode keeps the full viewer, minus the measurement "Track new study?"
+// prompt, which fires on every study load and is the popup radiologists
+// complained about.
 (function applyPatientMode() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -21,6 +22,10 @@
       'div[class*="ResizePanel"] { display:none !important; }',
       // Viewport takes full width.
       'div[data-cy="viewer-grid"], div[data-cy="viewport-container"] { left:0 !important; right:0 !important; width:100% !important; }',
+      // Kill every OHIF modal/dialog in patient mode. Patients should never
+      // see "Track measurements?" / "Discard?" / hydration prompts / labelling
+      // dialogs — they're not measuring anything.
+      '.ViewportDialog, [data-cy="viewport-notification"], [role="dialog"], [role="alertdialog"], .modal, .ReactModal__Overlay, .ReactModalPortal { display:none !important; }',
     ].join('\n');
     (document.head || document.documentElement).appendChild(style);
   } catch (_) {
@@ -33,20 +38,44 @@ window.config = {
   // Match the rewrite prefix on the peter-pan app so OHIF's SPA routes resolve
   // correctly when loaded via /pro-viewer/* in an iframe.
   routerBasename: '/pro-viewer',
-  extensions: [],
-  modes: [],
+  // Extensions parsed by the viewer. Order doesn't matter but the list must
+  // cover every modality we ship: SEG (DICOM segmentation), RT (structure
+  // sets), PMAP (parametric maps), SR (structured reports), PDF/video, plus
+  // cornerstone + default for base rendering.
+  extensions: [
+    '@ohif/extension-default',
+    '@ohif/extension-cornerstone',
+    '@ohif/extension-measurement-tracking',
+    '@ohif/extension-cornerstone-dicom-sr',
+    '@ohif/extension-cornerstone-dicom-seg',
+    '@ohif/extension-cornerstone-dicom-rt',
+    '@ohif/extension-cornerstone-dicom-pmap',
+    '@ohif/extension-cornerstone-dynamic-volume',
+    '@ohif/extension-tmtv',
+    '@ohif/extension-dicom-pdf',
+    '@ohif/extension-dicom-video',
+  ],
+  // Modes: longitudinal = default viewer (handles CT/MR/CR/DX/MG/US with the
+  // full toolbar); segmentation = SEG/RTSTRUCT overlay mode, auto-activates
+  // when the study contains SEG or RTSTRUCT series; tmtv = PET/CT fusion.
+  modes: [
+    '@ohif/mode-longitudinal',
+    '@ohif/mode-segmentation',
+    '@ohif/mode-tmtv',
+  ],
+  // Don't fire the "Track measurements for this study?" dialog on every study
+  // open — that's the popup the radiologists keep dismissing. Measurements
+  // still work; they just save silently without the prompt.
+  measurementTrackingMode: 'none',
   // OHIF's study list is not exposed — the peter-pan app handles worklist/nav.
   showStudyList: false,
-  // Force CPU rendering to avoid Cornerstone3D's WebGLContextPool which
-  // instantiates a vtkOffscreenMultiRenderWindow eagerly and crashes on
-  // `new Proxy(null, ...)` when WebGL2 context allocation fails (seen in
-  // production iframe contexts: "CornerstoneRender: GPU not detected, using
-  // CPU rendering" still fires while VTK tries WebGL2 anyway).
-  useCPURendering: true,
+  // GPU rendering required for MPR, volume/3D, and PET/CT fusion. If we see
+  // the old `new Proxy(null, ...)` crash from WebGLContextPool come back
+  // (was flagged in prior iframe contexts), fall back to CPU on that one
+  // study by appending &cpu=1 to the URL and forking this flag on it.
+  useCPURendering: false,
   maxNumberOfWebWorkers: 3,
   showWarningMessageForCrossOrigin: false,
-  // Suppress the "OHIF Fell Back to CPU Rendering" modal — we force CPU mode
-  // deliberately via useCPURendering, so the warning is noise.
   showCPUFallbackMessage: false,
   showLoadingIndicator: true,
   strictZSpacingForVolumeViewport: true,
@@ -72,6 +101,14 @@ window.config = {
         supportsWildcard: true,
         singlepart: 'bulkdata,video,pdf',
         omitQuotationForMultipartRequest: true,
+        // Enable bulkDataURI so SEG/RTSTRUCT can pull their binary blobs
+        // (segmentation pixel data, structure set contour data) via the same
+        // DICOMweb proxy. Without this, SEG/RTSTRUCT load as metadata-only
+        // and the overlays never render.
+        bulkDataURI: {
+          enabled: true,
+          relativeResolution: 'studies',
+        },
       },
     },
     {
