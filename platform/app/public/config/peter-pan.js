@@ -33,6 +33,24 @@
   }
 })();
 
+// Tenant-prefixed DICOMweb root. The iframe URL includes ?tenant=<slug>
+// when the host page can supply it; that lets us hit /<tenant>/api/dicomweb
+// directly and skip the /api/[...path] catchall, whose tenant inference
+// can't see past the /pro-viewer Referer prefix and 401s on iframe fetches.
+// Falls back to /api/dicomweb when no tenant param is present so portal and
+// any other caller without tenant context keeps working via the catchall.
+const dicomwebRoot = (function () {
+  try {
+    var tenant = new URLSearchParams(window.location.search).get('tenant');
+    if (tenant && /^[a-z0-9][a-z0-9-]{0,31}$/.test(tenant)) {
+      return '/' + tenant + '/api/dicomweb';
+    }
+  } catch (_) {
+    /* fall through */
+  }
+  return '/api/dicomweb';
+})();
+
 /** @type {AppTypes.Config} */
 window.config = {
   // Match the rewrite prefix on the peter-pan app so OHIF's SPA routes resolve
@@ -90,9 +108,9 @@ window.config = {
         // Relative URL — at runtime, the iframe's origin is the peter-pan app
         // (via /pro-viewer/* rewrite), so /api/dicomweb hits our DICOMweb proxy
         // with the user's session cookie attached.
-        wadoUriRoot: '/api/dicomweb',
-        qidoRoot: '/api/dicomweb',
-        wadoRoot: '/api/dicomweb',
+        wadoUriRoot: dicomwebRoot,
+        qidoRoot: dicomwebRoot,
+        wadoRoot: dicomwebRoot,
         qidoSupportsIncludeField: false,
         imageRendering: 'wadors',
         thumbnailRendering: 'wadors',
