@@ -34,6 +34,9 @@ import PlanarFreehandROI from './utils/measurementServiceMappings/PlanarFreehand
 import RectangleROI from './utils/measurementServiceMappings/RectangleROI';
 import type { PublicViewportOptions } from './services/ViewportService/Viewport';
 import ImageOverlayViewerTool from './tools/ImageOverlayViewerTool';
+// Side-effect: registers a metaData provider that strips bogus narrow-window
+// VOI and -1024 rescale on Secondary Capture dose-report screens.
+import './tools/SecondaryCaptureVOIFixProvider';
 import getSOPInstanceAttributes from './utils/measurementServiceMappings/utils/getSOPInstanceAttributes';
 import { findNearbyToolData } from './utils/findNearbyToolData';
 import { createFrameViewSynchronizer } from './synchronizers/frameViewSynchronizer';
