@@ -102,6 +102,33 @@ export default async function init({
     cornerstone.cache.setMaxCacheSize(maxCacheSize);
   }
 
+  // Per-viewport mapper tuning. The global sampleDistanceMultiplier
+  // above sets a default ray-step scale; this listener pins the
+  // absolute sample distance and max-samples-per-ray on every new
+  // volume so quality is deterministic regardless of source spacing.
+  // 0.5 + 2000 was the prod-tested combo that paired with the global
+  // 0.25 multiplier to eliminate banding on CT VR.
+  // (The setVolumeRenderingQulaity command in commandsModule does the
+  // same math for a quality slider; we apply a fixed high-quality
+  // floor here so the user gets the good rendering without flipping
+  // a control.)
+  eventTarget.addEventListener(EVENTS.VOLUME_VIEWPORT_NEW_VOLUME as any, (evt: any) => {
+    try {
+      const viewport = evt?.detail?.viewport ?? evt?.target;
+      if (!viewport || typeof viewport.getActors !== 'function') return;
+      const actors = viewport.getActors() || [];
+      for (const { actor } of actors) {
+        if (!actor || typeof actor.getMapper !== 'function') continue;
+        const mapper = actor.getMapper();
+        if (mapper?.setSampleDistance) mapper.setSampleDistance(0.5);
+        if (mapper?.setMaximumSamplesPerRay) mapper.setMaximumSamplesPerRay(2000);
+      }
+      if (typeof viewport.render === 'function') viewport.render();
+    } catch {
+      // Never let a quality tweak break volume mount.
+    }
+  });
+
   initCornerstoneTools();
 
   Settings.getRuntimeSettings().set('useCursors', Boolean(appConfig.useCursors));
