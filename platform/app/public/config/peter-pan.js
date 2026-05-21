@@ -109,15 +109,17 @@ window.config = {
   // (non-uniform spacing throughout, not a one-slice gap), MPR shows
   // visible warping and the user falls back to stack scroll.
   strictZSpacingForVolumeViewport: false,
-  // imageLoadPoolManager budgets. Without these, OHIF falls back to
-  // {prefetch:5, thumbnail:5} which leaves the wire idle once the visible
-  // viewport's first batch lands. Bumping prefetch to 25 keeps the
-  // background queue saturated so frames are decoded before the user
-  // scrolls to them.
+  // imageLoadPoolManager budgets. Measured: user link is ~5 Mbps and the
+  // browser's per-origin HTTP/2 effective concurrency caps at ~6. Going
+  // wider than that was queue churn, not throughput — and high prefetch
+  // (25) saturated the link so the visible viewport's interaction
+  // requests couldn't push through when the user scrolled. Cut to
+  // bandwidth-calibrated values: prefetch stays just above 1x the wire
+  // cap so background fills idle gaps without crowding foreground.
   maxNumRequests: {
-    interaction: 100,
-    thumbnail: 75,
-    prefetch: 25,
+    interaction: 6,
+    thumbnail: 6,
+    prefetch: 12,
     compute: 10,
   },
   // Built-in study prefetcher. Once a viewport mounts, queue frames for

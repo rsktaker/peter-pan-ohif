@@ -27,21 +27,66 @@ export const extensionDependencies = {
   '@ohif/extension-measurement-tracking': '^3.0.0',
 };
 
-// One-click switches to the 'mpr' and 'primary3D' hanging protocols
-// (registered by @ohif/extension-cornerstone, both with isPreset:true).
-// Crosshairs and TrackballRotate already sit in the primary toolbar but
-// only light up once the viewport is already in MPR / 3D mode — these
-// buttons make the mode switch discoverable instead of buried inside
-// Layout > Advanced Presets, which is the path the basic mode ships.
+// Override the basic-mode Crosshairs and TrackballRotate buttons so a
+// click switches to the correct hanging protocol first AND then activates
+// the tool. The upstream definitions gate on the active viewport already
+// being MPR / 3D and render as disabled otherwise — which surfaced to
+// users as "3D is broken" because there's no obvious path to get into
+// the right layout. Now: one click does both.
+//
+// Also add explicit MPR and Volume3D buttons next to Layout for the
+// users who want the layout switch alone without activating a specific
+// tool.
+const overrideBasicButton = (id: string, replacement: any) =>
+  basicToolbarButtons.map((b: any) => (b.id === id ? replacement : b));
+
+const withCrosshairsAndTrackballOverridden = overrideBasicButton('Crosshairs', {
+  id: 'Crosshairs',
+  uiType: 'ohif.toolButton',
+  props: {
+    type: 'tool',
+    icon: 'tool-crosshair',
+    label: 'Crosshairs',
+    tooltip: 'Switch to MPR and activate crosshairs',
+    // Command array: layout switch first, then tool activation. After
+    // setHangingProtocol fires, the active viewport is MPR and the 'mpr'
+    // toolGroup is the right target. evaluate.action keeps it always
+    // enabled instead of waiting for the user to already be in MPR.
+    commands: [
+      { commandName: 'setHangingProtocol', commandOptions: { protocolId: 'mpr' } },
+      { commandName: 'setToolActiveToolbar', commandOptions: { toolGroupIds: ['mpr'] } },
+    ],
+    evaluate: 'evaluate.action',
+  },
+}).map((b: any) =>
+  b.id === 'TrackballRotate'
+    ? {
+        id: 'TrackballRotate',
+        uiType: 'ohif.toolButton',
+        props: {
+          type: 'tool',
+          icon: 'tool-3d-rotate',
+          label: '3D Rotate',
+          tooltip: 'Switch to 3D Volume Rendering and activate rotate',
+          commands: [
+            { commandName: 'setHangingProtocol', commandOptions: { protocolId: 'primary3D' } },
+            { commandName: 'setToolActiveToolbar' },
+          ],
+          evaluate: 'evaluate.action',
+        },
+      }
+    : b,
+);
+
 const peterPanToolbarButtons = [
-  ...basicToolbarButtons,
+  ...withCrosshairsAndTrackballOverridden,
   {
     id: 'MprPreset',
     uiType: 'ohif.toolButton',
     props: {
       icon: 'layout-advanced-mpr',
       label: 'MPR',
-      tooltip: 'Switch to MPR (3-plane reformat). Requires a reconstructable volume — disabled for single-slice modalities (CR/DX/MG).',
+      tooltip: 'Switch to MPR (3-plane reformat).',
       commands: { commandName: 'setHangingProtocol', commandOptions: { protocolId: 'mpr' } },
       evaluate: 'evaluate.action',
     },
@@ -52,7 +97,7 @@ const peterPanToolbarButtons = [
     props: {
       icon: 'layout-advanced-3d-primary',
       label: '3D',
-      tooltip: 'Switch to 3D Volume Rendering. Requires a reconstructable volume — disabled for single-slice modalities (CR/DX/MG).',
+      tooltip: 'Switch to 3D Volume Rendering.',
       commands: { commandName: 'setHangingProtocol', commandOptions: { protocolId: 'primary3D' } },
       evaluate: 'evaluate.action',
     },
