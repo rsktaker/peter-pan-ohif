@@ -165,6 +165,18 @@ class StudyPrefetcherService extends PubSubService {
     this._subscriptions = [];
 
     Object.assign(this.config, configuration);
+
+    // peter-pan diagnostic: prod observed "StudyPrefetcher is not enabled"
+    // logged even though window.config.studyPrefetcher.enabled is true in
+    // app-config.js. Print what actually landed so we can tell whether
+    // Object.assign ran, whether `configuration` was undefined, or whether
+    // something downstream is mutating this.config back to off. One log
+    // per registration (service is a singleton) so noise is minimal.
+    // eslint-disable-next-line no-console
+    console.info('[peter-pan][StudyPrefetcherService] constructed', {
+      receivedConfiguration: configuration,
+      resolvedConfig: { ...this.config },
+    });
   }
 
   public onModeEnter(): void {
