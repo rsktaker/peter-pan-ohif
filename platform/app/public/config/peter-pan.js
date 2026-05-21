@@ -113,6 +113,11 @@ window.config = {
   measurementTrackingMode: 'none',
   // OHIF's study list is not exposed — the peter-pan app handles worklist/nav.
   showStudyList: false,
+  // Suppress the "OHIF Viewer is for investigational use only" banner.
+  // The peter-pan app is the user-facing product; OHIF is an embedded
+  // viewer and our medical-device compliance is handled at the product
+  // level. 'never' = the InvestigationalUseDialog returns null on mount.
+  investigationalUseDialog: { option: 'never' },
   // GPU rendering required for MPR, volume/3D, and PET/CT fusion. If we see
   // the old `new Proxy(null, ...)` crash from WebGLContextPool come back
   // (was flagged in prior iframe contexts), fall back to CPU on that one
