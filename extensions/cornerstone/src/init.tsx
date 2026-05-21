@@ -80,6 +80,19 @@ export default async function init({
       // loss on 12/16-bit CT and improves sample throughput. Forward it
       // from window.config so we don't need a fork-side default.
       useNorm16Texture: appConfig.useNorm16Texture ?? false,
+      // Quarter-distance volume sampling = 4x more samples through the
+      // volume per ray. The previous default (1.0) produced visible
+      // horizontal banding artifacts on abdomen / chest CT VR — not a
+      // preset issue (CT-Bone / CT-AAA both showed it), but pure ray
+      // undersampling. 0.25 trades GPU work for clean fluoroscopic
+      // gradients. The mapper.setSampleDistance(0.5) per-viewport tweak
+      // recommended alongside this is best applied at volume-mount time
+      // (cornerstoneViewportService.onVolumeMounted hook); pending
+      // when we add that hook.
+      volumeRendering: {
+        ...((cornerstone.getConfiguration().rendering as any)?.volumeRendering ?? {}),
+        sampleDistanceMultiplier: 0.25,
+      },
     },
   });
 

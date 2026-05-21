@@ -56,9 +56,9 @@ export const only3D = {
               id: 'activeDisplaySet',
               options: {
                 displayPreset: {
-                  CT: 'CT-Soft Tissue',
+                  CT: 'CT-AAA',
                   MR: 'MR-Default',
-                  default: 'CT-Soft Tissue',
+                  default: 'CT-AAA',
                 },
               },
             },
