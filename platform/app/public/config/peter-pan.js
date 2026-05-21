@@ -134,13 +134,18 @@ window.config = {
     compute: 10,
   },
   // Built-in study prefetcher. Once a viewport mounts, queue frames for
-  // up to 2 neighboring displaySets in proximity order. With JPEG-LS
-  // transcoding (188KB/frame, validated on prod) a 117-instance CT
-  // series stages in the background instead of stalling on scroll.
+  // displaySetsCount neighboring displaySets in proximity order.
+  // - displaySetsCount 4: prefetch is now wide enough to cover all 4 series
+  //   of a typical multi-phase abdomen CT (pre, arterial, portal, delayed)
+  //   so series-switching during a scroll-through is instant.
+  // - maxNumPrefetchRequests 20: matches the prefetch budget unlocked by
+  //   the proxy keepalive pool (connections:64) and Orthanc's
+  //   HttpThreadsCount=100. Below 20 we were leaving idle handlers on
+  //   the table; above it we'd contend with interaction priority frames.
   studyPrefetcher: {
     enabled: true,
-    displaySetsCount: 2,
-    maxNumPrefetchRequests: 10,
+    displaySetsCount: 4,
+    maxNumPrefetchRequests: 20,
     order: 'closest',
   },
   defaultDataSourceName: 'dicomweb',
