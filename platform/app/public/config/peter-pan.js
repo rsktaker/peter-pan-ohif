@@ -112,6 +112,14 @@ window.config = {
   // sampling on GPUs that support it (most modern desktops do). cs3d
   // falls back to 8-bit when the GPU can't.
   useNorm16Texture: true,
+  // 2 GB in-memory cache for decoded frames. Without this, cs3d falls
+  // back to its conservative default (~1 GB) and evicts aggressively on
+  // multi-series studies. Decoded JPEG-LS frames are pure pixel data,
+  // so 2 GB holds ~4x a typical 117-instance CT study at full
+  // resolution. Same-tab re-opens are then instant — no Orthanc round
+  // trip, no decode. A cross-tab service worker cache is the next
+  // step for cold-tab persistence.
+  maxCacheSize: 2 * 1024 * 1024 * 1024,
   // imageLoadPoolManager budgets. Measured: user link is ~5 Mbps and the
   // browser's per-origin HTTP/2 effective concurrency caps at ~6. Going
   // wider than that was queue churn, not throughput — and high prefetch
