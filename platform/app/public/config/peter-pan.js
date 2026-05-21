@@ -99,16 +99,19 @@ window.config = {
   showWarningMessageForCrossOrigin: false,
   showCPUFallbackMessage: false,
   showLoadingIndicator: true,
-  // Off: too aggressive for real-world CT/MR. A study with one missing
-  // slice (modality glitch, network dropout during transfer) is otherwise
-  // perfectly reconstructable but with this flag on, MPR and Volume3D
-  // refuse to mount and the user sees "no 3D available" with no clue why.
-  // Cornerstone3D still computes geometry from the available slices;
-  // the displayed volume is approximate over the gap but clinically
-  // usable for orientation. If a series turns out to be truly chaotic
-  // (non-uniform spacing throughout, not a one-slice gap), MPR shows
-  // visible warping and the user falls back to stack scroll.
-  strictZSpacingForVolumeViewport: false,
+  // BACK ON. Setting this false to "let more studies into 3D" trades
+  // unavailable-3D for visually-broken-3D: irregular Z-spacing causes
+  // severe horizontal banding / slice-stretching in the volume render.
+  // Live prod test on the KAWAS ABDOMEN CT showed this clearly. For
+  // diagnostic radiology a refused volume is correct behavior — a
+  // wrong-looking one is harmful. Studies that don't qualify still
+  // open as stack viewports. extensions/cornerstone/src/init.tsx
+  // forwards this value into Cornerstone3D's rendering config.
+  strictZSpacingForVolumeViewport: true,
+  // 16-bit normalized texture path. ~2x precision over 8-bit + faster
+  // sampling on GPUs that support it (most modern desktops do). cs3d
+  // falls back to 8-bit when the GPU can't.
+  useNorm16Texture: true,
   // imageLoadPoolManager budgets. Measured: user link is ~5 Mbps and the
   // browser's per-origin HTTP/2 effective concurrency caps at ~6. Going
   // wider than that was queue churn, not throughput — and high prefetch

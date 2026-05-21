@@ -74,6 +74,12 @@ export default async function init({
     rendering: {
       ...cornerstone.getConfiguration().rendering,
       strictZSpacingForVolumeViewport: appConfig.strictZSpacingForVolumeViewport,
+      // Live prod cs3d.getConfiguration().rendering showed only the
+      // strictZ field was being forwarded — useNorm16Texture stayed at
+      // the cs3d default (false). On supported GPUs this halves precision
+      // loss on 12/16-bit CT and improves sample throughput. Forward it
+      // from window.config so we don't need a fork-side default.
+      useNorm16Texture: appConfig.useNorm16Texture ?? false,
     },
   });
 
