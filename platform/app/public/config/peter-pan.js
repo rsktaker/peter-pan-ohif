@@ -33,6 +33,32 @@
   }
 })();
 
+// Defense-in-depth: register the DICOMweb cache service worker from
+// inside the OHIF iframe too. The parent peter-pan page already does
+// this and the SW has scope=/ which covers same-origin iframes — but
+// only if the iframe loaded WHILE the SW was already active. On first
+// visit the iframe finishes loading before the parent's register
+// resolves, so its initial fetches go uncontrolled. Registering here
+// (which runs early in the iframe's own JS) ensures that after the
+// first round-trip the iframe IS controlled for future fetches, and
+// hands a chance to log SW status from the iframe's console.
+try {
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker
+      .register('/sw-dicomweb-cache.js', { scope: '/' })
+      .then(function () {
+        // eslint-disable-next-line no-console
+        console.info('[dicomweb-sw][iframe] register OK');
+      })
+      .catch(function (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[dicomweb-sw][iframe] register failed', err);
+      });
+  }
+} catch (_) {
+  /* never break OHIF boot on SW issues */
+}
+
 // Tenant-prefixed DICOMweb root. The iframe URL includes ?tenant=<slug>
 // when the host page can supply it; that lets us hit /<tenant>/api/dicomweb
 // directly and skip the /api/[...path] catchall, whose tenant inference
