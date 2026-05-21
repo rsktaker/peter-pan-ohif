@@ -99,7 +99,16 @@ window.config = {
   showWarningMessageForCrossOrigin: false,
   showCPUFallbackMessage: false,
   showLoadingIndicator: true,
-  strictZSpacingForVolumeViewport: true,
+  // Off: too aggressive for real-world CT/MR. A study with one missing
+  // slice (modality glitch, network dropout during transfer) is otherwise
+  // perfectly reconstructable but with this flag on, MPR and Volume3D
+  // refuse to mount and the user sees "no 3D available" with no clue why.
+  // Cornerstone3D still computes geometry from the available slices;
+  // the displayed volume is approximate over the gap but clinically
+  // usable for orientation. If a series turns out to be truly chaotic
+  // (non-uniform spacing throughout, not a one-slice gap), MPR shows
+  // visible warping and the user falls back to stack scroll.
+  strictZSpacingForVolumeViewport: false,
   // imageLoadPoolManager budgets. Without these, OHIF falls back to
   // {prefetch:5, thumbnail:5} which leaves the wire idle once the visible
   // viewport's first batch lands. Bumping prefetch to 25 keeps the
